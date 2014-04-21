@@ -29,8 +29,8 @@ axis([1 2500 1 2500])
 
 %Move a point to another location
 index = 10;
-xdirection = 50;
-ydirection = 50;
+xdirection = 200;
+ydirection = 200;
 %writerObj = VideoWriter('Drag Movement.avi');
 %writerObj.FrameRate = 5;
 %open(writerObj);

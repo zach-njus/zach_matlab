@@ -1,7 +1,11 @@
-function [ grayimg ] = pixelLine1( x0,y0,x1,y1,grayimg,intensity )
+function [ grayimg ] = pixelLine1( point1,point2,grayimg,intensity )
 % Implements the optomized Bresenham's line algorithm to draw a pixel wide
 % line
 % grayimg should be of type uint8
+x0=point1(1,1);
+x1=point2(1,1);
+y0=point1(1,2);
+y1=point2(1,2);
 dx=abs(x1-x0);
 dy=abs(y1-y0);
 if(x0<x1)

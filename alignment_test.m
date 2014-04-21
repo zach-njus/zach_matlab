@@ -3,7 +3,7 @@
 close all;
 clear all;
 
-vid = VideoReader('Greg Report/SCN_single_close_130327_1.mp4');
+vid = VideoReader('Greg Report/SCN_multiple_close_130327_1.mp4');
 image = read(vid,1);
 
 image = rgb2gray(image);
