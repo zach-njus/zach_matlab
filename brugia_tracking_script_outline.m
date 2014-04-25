@@ -4,7 +4,7 @@ filename = [path,file];
 vid = VideoReader(filename);
 %%
 %display the first frame to perform segmentation
-start_frame = 350;
+start_frame = 678;
 first_frame = read(vid,start_frame);
 mask = roipoly(first_frame);
 background = first_frame;
@@ -46,6 +46,7 @@ i=start_frame+1;
     %fine binary worm for the current frame
     second_frame = read(vid,i);
     sub2 = background - second_frame;
+    flow_image = double(second_frame)/255;
     sub2 = rgb2gray(sub2);
     bin2 = sub2 > 10;
     bin2=~bwareaopen(~bin2,50);
@@ -96,7 +97,7 @@ i=start_frame+1;
     skel_broke = skel_broke|skel_endsections;
     
     
-    flow_image(:,:,2) = skel_broke;
+    flow_image(:,:,2) = flow_image(:,:,2)+double(skel_broke);
     imshow(flow_image)
     set(gca,'position',[0 0 1 1],'units','normalized')
     
