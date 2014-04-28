@@ -11,6 +11,7 @@ function [ model ] = updatePose( model,index,direction,radius )
         %direction
         theta = vectorRadianDist(model(index+direction,1),...
             model(index+direction,2),model(index,1),model(index,2));
+        
         xdirection = radius*cos(theta);
         ydirection = radius*sin(theta);
         model(index+direction,1) = model(index,1)+xdirection;

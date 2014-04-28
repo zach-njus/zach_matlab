@@ -1,4 +1,4 @@
-%{
+
 clc
 close all
 clear all
@@ -8,7 +8,7 @@ filename = [path,file];
 vid = VideoReader(filename);
 %%
 %display the first frame to perform segmentation
-start_frame = 10;
+start_frame = 100;
 first_frame = read(vid,start_frame);
 mask = roipoly(first_frame);
 background = first_frame;
@@ -82,10 +82,10 @@ for i = start_frame:start_frame+100;
     sub2 = rgb2gray(sub2);
     bin2 = sub2 > 10;
     bin2=~bwareaopen(~bin2,100);
-     flow_image = zeros(size(bin1,1),size(bin1,2),3);
- flow_image(:,:,1) = bin1;
- flow_image(:,:,3) = bin2;
- imshow(flow_image)
+     %flow_image = zeros(size(bin1,1),size(bin1,2),3);
+ %flow_image(:,:,1) = bin1;
+ %flow_image(:,:,3) = bin2;
+ %imshow(flow_image)
     %label the second frame and only keep the largest blob with an overlap
     %from the previous frame
     [bin2_labeled] = bwlabel(bin2);
@@ -191,7 +191,27 @@ for i = start_frame:start_frame+100;
         pointsc = [pointsc;colc(1)];
         labeled(rowc(1),colc(1)) = 0;
         c_length = sum(sqrt(sum(transpose(diff([pointsc,pointsr]).^2))));
-        if(c_length > (current_index-1)*average_width*2 && current_index < length(worm.center) && length(pointsr)>1)
+        if(c_length > (current_index-1)*average_width*2.1 && current_index < length(worm.center) && length(pointsr)>1)
+            [~,dist] = vectorRadianDist(worm.center(current_index,1),worm.center(current_index,2),pointsc(end),pointsr(end));
+            iterations = round(dist/average_width*10);
+            xdiff = (pointsc(end)-worm.center(current_index,1))/iterations;
+            ydiff = (pointsr(end)-worm.center(current_index,2))/iterations;
+            imshow(second_frame);
+            hold on
+            for k = 1:iterations
+                for q = current_index:length(worm.center)
+                worm.center(q,:) = [worm.center(q,1)+xdiff,...
+                    worm.center(q,2)+ydiff];
+                end
+                %worm.center = updatePose(worm.center,current_index,1,average_width*2);
+                colors = jet(length(worm.center));
+            end
+            for z = 1:length(worm.center)
+                circle(worm.center(z,1),worm.center(z,2),average_width,colors(z,:));
+            end
+            pause(.01)
+            clf('reset')
+            
             worm.center(current_index,:) = [pointsc(end),pointsr(end)];
             worm.center = updatePose(worm.center,current_index,1,average_width*2);
             current_index = current_index + 1;
