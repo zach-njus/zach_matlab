@@ -1,4 +1,4 @@
-%{
+
 clc
 close all
 clear all
@@ -8,7 +8,7 @@ filename = [path,file];
 vid = VideoReader(filename);
 %%
 %display the first frame to perform segmentation
-start_frame = 300;
+start_frame = 1;
 first_frame = read(vid,start_frame);
 mask = roipoly(first_frame);
 background = first_frame;
@@ -24,13 +24,15 @@ pause(2);
 %}
 %%
 %discretize user points based on distance array
-start_frame = 500;
+
 num_points = 60;
+
 worm.center = skel_handles([cols,rows],num_points);
 start_worm.center = worm.center;
 imshow(first_frame)
 hold on
 plot(worm.center(:,1),worm.center(:,2),'r*');
+
 %%
 %develop body of the worm
 average_width = sqrt((worm.center(1,2)-worm.center(2,2))^2+(worm.center(1,1)-worm.center(2,1))^2)/2;
@@ -38,9 +40,8 @@ colors = jet(length(worm.center));
 for i = 1:length(worm.center)
     circle(worm.center(i,1),worm.center(i,2),average_width,colors(i,:));
 end
-
 %%
-vido = VideoWriter('pixel_intensity1.mp4');
+vido = VideoWriter('pixel_intensity11.mp4','MPEG-4');
 vido.FrameRate = 10;
 open(vido);
 worm.center = start_worm.center;
@@ -48,26 +49,54 @@ worm.center = start_worm.center;
 flow_image = zeros(size(first_frame,1),size(first_frame,2),3);
 i=start_frame+1;
 worm_length = sum(sqrt(sum(transpose(diff(worm.center).^2))));
-for i = start_frame:start_frame+100;
-    %find binary worm for the previous frame
+
+%find binary worm for the previous frame
     sub = uint8(abs(double(background) - double(first_frame)));
     sub = rgb2gray(sub);
-    bin1 = sub > 10;
+    bin1 = sub > 5;
     bin1=~bwareaopen(~bin1,50,4);
-    
+    %label and only record the largest object
+    [bin1_labeled,n] = bwlabel(bin1);
+    csum=0;
+    msum=0;
+    for j = 1:n
+        csum = sum(sum(bin1_labeled==j));
+        if(csum>msum)
+            bin1 = bin1_labeled==j;
+            msum = csum;
+        end
+    end
+
+%for i = start_frame:start_frame+100;
+for i = 1:vid.NumberOfFrames+500;
+ %i=418;   
     %fine binary worm for the current frame
     second_frame = read(vid,i);
     sub2 = uint8(abs(double(background) - double(second_frame)));
     flow_image = double(second_frame)/255;
     sub2 = rgb2gray(sub2);
-    bin2 = sub2 > 10;
-    bin2=~bwareaopen(~bin2,50);
+    bin2 = sub2 > 5;
+    bin2=~bwareaopen(~bin2,100);
+    %label the second frame and only keep the largest blob with an overlap
+    %from the previous frame
+    [bin2_labeled] = bwlabel(bin2);
+    bin2_temp = bin2_labeled.*double(bin1);
+    n = unique(bin2_temp);
+    csum = 0;
+    msum = 0;
+    for j = 1:length(n)
+        csum = sum(sum(bin2_labeled==n(j)));
+        if(csum>msum && n(j)>0)
+            bin2 = bin2_labeled==n(j);
+            msum = csum;
+        end
+    end
     
     %develop skeleton for the current frame
     dist_trans1 = bwdist(~imfill(bin2,'holes'));
     dist_trans = bwdist(~bin2);
     dist_trans1 = (dist_trans1>average_width*.8)&(dist_trans1<average_width*1.5);
-    dist_trans = bwmorph(bwmorph((dist_trans>average_width*.8)&(dist_trans<average_width*1.5),'thin','inf'),'dilate',1);
+    dist_trans = bwmorph(bwmorph((dist_trans>average_width*.8)&(dist_trans<average_width*1.5),'thin',inf),'dilate',2);
     dist_trans = dist_trans|dist_trans1;
     
     skel = bwmorph(dist_trans,'thin',inf);
@@ -105,8 +134,8 @@ for i = start_frame:start_frame+100;
     
     %eliminate small sections of skeleton and add back in end sections if
     %eliminated
-    skel_broke = bwareaopen(skel_broke,10,8);
-    skel_broke = skel_broke|skel_endsections;
+    skel_broke = bwareaopen(skel_broke,round(average_width*4),8);
+    %skel_broke = skel_broke|skel_endsections;
     [labeled,n] = bwlabel(skel_broke,8);
     
     %find endpoints at the ends of each section
@@ -119,15 +148,7 @@ for i = start_frame:start_frame+100;
     end
     
     flow_image(:,:,2) = flow_image(:,:,2)+double(skel_broke);
-    %figure;
-    %imshow(flow_image)
-    %set(gca,'position',[0 0 1 1],'units','normalized')
-    
-    
-    pause(.01);
-    %figure;
-    imshow(rgb2gray(flow_image))
-    
+    imshow(rgb2gray(flow_image).*double(bin2))
     
     %direction
     direction = 1;
@@ -137,6 +158,19 @@ for i = start_frame:start_frame+100;
     pointsc = [];
     D = bwdistgeodesic(skel_broke,cole(biggest_section),rowe(biggest_section));
     c_length = 0;
+    
+    %decide which direction from the old skeleton you are starting
+    dist = zeros(2,1);
+    [~,dist(1,1)] = vectorRadianDist(cole(biggest_section),rowe(biggest_section),...
+            worm.center(1,1),worm.center(1,2));
+    [~,dist(2,1)] = vectorRadianDist(cole(biggest_section),rowe(biggest_section),...
+            worm.center(end,1),worm.center(end,2)); 
+    if(dist(2)<dist(1))
+        worm.center = transpose(fliplr(transpose(worm.center)));
+    end
+
+ %start tracking along worm   
+ current_index = 1;
  while(c_length < worm_length)   
     D(isnan(D))=0;
     D(isinf(D))=-1;
@@ -144,9 +178,23 @@ for i = start_frame:start_frame+100;
         [rowc,colc] = find(D == j);
         pointsr = [pointsr;rowc(1)];
         pointsc = [pointsc;colc(1)];
+        labeled(rowc(1),colc(1)) = 0;
+        c_length = sum(sqrt(sum(transpose(diff([pointsc,pointsr]).^2))));
+        if(c_length > (current_index-1)*average_width*2 && current_index < length(worm.center) && length(pointsr)>1)
+            worm.center(current_index,:) = [pointsc(end),pointsr(end)];
+            worm.center = updatePose(worm.center,current_index,1,average_width*2);
+            current_index = current_index + 1;
+            %colors = jet(length(worm.center));
+            %imshow(second_frame);
+            %for k = 1:length(worm.center)
+                %circle(worm.center(k,1),worm.center(k,2),average_width,colors(k,:));
+            %end
+            %pause(.1)
+            %clf('reset')
+        end
         current_label = labeled(pointsr(end),pointsc(end));
     end
-    
+    [rowb,colb] = find(bwmorph(skel_broke,'endpoints'));
     dist = zeros(length(rowb),1);
     vect = dist;
     for j = 1:length(rowb)
@@ -160,97 +208,92 @@ for i = start_frame:start_frame+100;
     
     hold on;
     plot(pointsc,pointsr,'r*');
+    plot(cole,rowe,'go','linewidth',3)
     
     [val,loc] = min(dist);
     close_points = sum(dist<val*2);
     %is there a single point that is close enough
-    if(close_points<2 && val < 10)
-        plot(colb(loc),rowb(loc),'b*');
-        D = bwdistgeodesic(skel_broke,colb(loc),rowb(loc));
-    else
+    %if(close_points<2 && val < 10 && max(dist)>0)
+        %plot(colb(loc),rowb(loc),'b*');
+        %%D = bwdistgeodesic(temp,colb(loc),rowb(loc));
+    if(val<50 && val > 0)
         %analyze pixel values connecting close sections
         locs = find(dist<val*2);
         blank = zeros(size(flow_image,1),size(flow_image,2));
         gray_frame = rgb2gray(second_frame);
         pixel_std = zeros(length(locs),1);
+        pixel_min = pixel_std;
         for j = 1:length(locs)
             blank = pixelLine1([pointsc(end),pointsr(end)],[colb(locs(j)),rowb(locs(j))],blank,1);
             [rowt,colt] = find(blank);
+            if(length(rowt)<20)
+                blank = blank | (labeled(rowb(locs(j)),colb(locs(j)))==labeled);
+                [rowt,colt] = find(blank);
+            end
             pixels = zeros(length(rowt),1);
             for k = 1:length(rowt)
                 pixels(k,1) = gray_frame(rowt(k),colt(k));
             end
             pixel_std(j) = std(pixels);
-            %imshow(double(gray_frame)/255+blank);
-            %pause(3);
+            pixel_min(j) = min(pixels);
+
             blank(:,:)=0;
+            length(pixels)
         end
         [val,loc]=min(pixel_std);
-        
-        D = bwdistgeodesic(skel_broke,colb(locs(loc)),rowb(locs(loc)));
-        plot(colb(locs(loc)),rowb(locs(loc)),'ko');
-        %{
-        %is there a predicted point that is very close
-        pre_val = val;
-        weight = .1;
-        while(weight<1.1)
-            point = predict_point([pointsc(end-20:end),pointsr(end-20:end)],pre_val*weight);
-            plot(point(1),point(2),'co');
-
-            dist = zeros(length(rowb),1);
-            vect = dist;
-            for j = 1:length(rowb)
-                [vect(j),dist(j)] = vectorRadianDist(colb(j),rowb(j),point(1),point(2));
-                %prevention from jumping back to previous section
-                if(labeled(rowb(j),colb(j))==labeled(pointsr(end),pointsc(end)))
-                    dist(j) = 0;
-                end
-            end
-            dist(dist==0) = max(dist);
-            [val,loc] = min(dist);
-            close_points = sum(dist<val*1.5);
-            %if(close_points > 1)
-                weight = weight+.1;
-            %else
-                %break;
-            %end
-        end
-        
-        if(close_points<2 && val < 10)
-            D = bwdistgeodesic(skel_broke,colb(loc),rowb(loc));
-            plot(colb(loc),rowb(loc),'ko');
-        elseif(close_points>2 && val < 10)
-            %if there are two points that are the same distance then choose
-            %the bigger one 
-            locs = find(dist<val*2);
-            sizes = zeros(length(locs),1);
-            for j = 1:length(locs)
-                sizes(j) = sum(sum(labeled==labeled(rowb(locs(j)),colb(locs(j)))));
-            end
-            locsizes = find(max(sizes)==sizes);
-            if(length(locsizes)>1)
-                disp('segments are equally spaced and the same size :(');
-            else
-                D = bwdistgeodesic(skel_broke,colb(locs(locsizes)),rowb(locs(locsizes)));
-                plot(colb(locs(locsizes)),rowb(locs(locsizes)),'ko');
-            end
-        else
+        title([num2str(i),'     ',num2str(min(pixel_min))]);
+        %if(sum(pixel_std<min(pixel_std)*4)>1)
+        if(1)
+            next_point = predict_point([pointsc(end-15:end),pointsr(end-15:end)],15);
+            average_point = (next_point+3*worm.center(current_index,:))/4;
+            imshow(second_frame)
+                hold on;
+            plot(pointsc,pointsr,'r*');
+            plot(colb(locs),rowb(locs),'g*','linewidth',3)
             
-            break;
+            plot(average_point(1),average_point(2),'k*','linewidth',2);
+            
+            %find the endpoint that is closest to the predicted point
+            dist = zeros(length(locs),1);
+            for j = 1:length(locs)
+                [~,dist(j)] = vectorRadianDist(colb(locs(j)),rowb(locs(j)),average_point(1),average_point(2));
+            end
+            [val,loc] = min(dist);
+            
+            title('std was very close');
+            %pause(3)
         end
-        %}
+        temp = pixelLine1([colb(locs(loc)),rowb(locs(loc))],[pointsc(end),pointsr(end)],labeled==labeled(rowb(locs(loc)),colb(locs(loc))),1);
+        temp(pointsr(end),pointsc(end))=1;
+        imshow(temp)
+        hold on;
+        plot(colb(locs),rowb(locs),'g*','linewidth',3)
+        plot(pointsc(end),pointsr(end),'r*');
+        %pause(2)
+        D = bwdistgeodesic(temp,pointsc(end),pointsr(end));
+        
+        %D = bwdistgeodesic(skel_broke,colb(locs(loc)),rowb(locs(loc)));
+        plot(colb(locs(loc)),rowb(locs(loc)),'ko');
+    else
+        break;
     end
         
     c_length = sum(sqrt(sum(transpose(diff([pointsc,pointsr]).^2))));
  end
- 
- colors = jet(length(pointsr));
- for j = 1:length(pointsr)
-     plot(pointsc(j),pointsr(j),'*','color',colors(j,:));
- end
+ bin1=bin2;
+ worm.center = skel_handles([pointsc,pointsr],num_points);
+ colors = jet(length(worm.center));
+ imshow(second_frame);
+for j = 1:length(worm.center)
+    circle(worm.center(j,1),worm.center(j,2),average_width,colors(j,:));
+end
+ %for j = 1:length(pointsr)
+ %    plot(pointsc(j),pointsr(j),'*','color',colors(j,:));
+ %end
+
  frame = getframe(gcf);
  writeVideo(vido,frame);
- pause(1)
+ pause(.1)
  clf('reset')
 end
 close(vido);
