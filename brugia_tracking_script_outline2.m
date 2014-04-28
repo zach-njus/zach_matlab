@@ -1,4 +1,4 @@
-
+%{
 clc
 close all
 clear all
@@ -8,7 +8,7 @@ filename = [path,file];
 vid = VideoReader(filename);
 %%
 %display the first frame to perform segmentation
-start_frame = 1;
+start_frame = 10;
 first_frame = read(vid,start_frame);
 mask = roipoly(first_frame);
 background = first_frame;
@@ -43,7 +43,7 @@ for i = 1:length(worm.center)
     circle(worm.center(i,1),worm.center(i,2),average_width,colors(i,:));
 end
 %%
-newfile = 'video13';
+newfile = 'video14';
 vido = VideoWriter([newfile,'.mp4'],'MPEG-4');
 vido.FrameRate = 10;
 open(vido);
@@ -82,6 +82,10 @@ for i = start_frame:start_frame+100;
     sub2 = rgb2gray(sub2);
     bin2 = sub2 > 10;
     bin2=~bwareaopen(~bin2,100);
+     flow_image = zeros(size(bin1,1),size(bin1,2),3);
+ flow_image(:,:,1) = bin1;
+ flow_image(:,:,3) = bin2;
+ imshow(flow_image)
     %label the second frame and only keep the largest blob with an overlap
     %from the previous frame
     [bin2_labeled] = bwlabel(bin2);
@@ -253,12 +257,12 @@ for i = start_frame:start_frame+100;
         if(1)
             next_point = predict_point([pointsc(end-15:end),pointsr(end-15:end)],15);
             average_point = (next_point+3*worm.center(current_index,:))/4;
-            %imshow(second_frame)
-            %    hold on;
-            %plot(pointsc,pointsr,'r*');
-            %plot(colb(locs),rowb(locs),'g*','linewidth',3)
+            imshow(second_frame)
+                hold on;
+            plot(pointsc,pointsr,'r*');
+            plot(colb(locs),rowb(locs),'g*','linewidth',3)
             
-            %plot(average_point(1),average_point(2),'k*','linewidth',2);
+            plot(average_point(1),average_point(2),'k*','linewidth',2);
             
             %find the endpoint that is closest to the predicted point
             dist = zeros(length(locs),1);
@@ -287,6 +291,7 @@ for i = start_frame:start_frame+100;
         
     c_length = sum(sqrt(sum(transpose(diff([pointsc,pointsr]).^2))));
  end
+
  bin1=bin2;
 
  worm.center = skel_handles([pointsc,pointsr],num_points);
