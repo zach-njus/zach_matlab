@@ -15,6 +15,8 @@ background = first_frame;
 for i = 1:3
     background(:,:,i) = roifill(first_frame(:,:,i),mask);
 end
+
+
 %%
 
 %have user highlight centerline
@@ -41,7 +43,8 @@ for i = 1:length(worm.center)
     circle(worm.center(i,1),worm.center(i,2),average_width,colors(i,:));
 end
 %%
-vido = VideoWriter('pixel_intensity11.mp4','MPEG-4');
+newfile = 'video13';
+vido = VideoWriter([newfile,'.mp4'],'MPEG-4');
 vido.FrameRate = 10;
 open(vido);
 worm.center = start_worm.center;
@@ -67,15 +70,17 @@ worm_length = sum(sqrt(sum(transpose(diff(worm.center).^2))));
         end
     end
 
-%for i = start_frame:start_frame+100;
-for i = 1:vid.NumberOfFrames+500;
+    %array to store all points throughout video
+    worm_coords = [];
+for i = start_frame:start_frame+100;
+%for i = 1:vid.NumberOfFrames;
  %i=418;   
     %fine binary worm for the current frame
     second_frame = read(vid,i);
     sub2 = uint8(abs(double(background) - double(second_frame)));
     flow_image = double(second_frame)/255;
     sub2 = rgb2gray(sub2);
-    bin2 = sub2 > 5;
+    bin2 = sub2 > 10;
     bin2=~bwareaopen(~bin2,100);
     %label the second frame and only keep the largest blob with an overlap
     %from the previous frame
@@ -161,12 +166,14 @@ for i = 1:vid.NumberOfFrames+500;
     
     %decide which direction from the old skeleton you are starting
     dist = zeros(2,1);
+    flag = 0;
     [~,dist(1,1)] = vectorRadianDist(cole(biggest_section),rowe(biggest_section),...
             worm.center(1,1),worm.center(1,2));
     [~,dist(2,1)] = vectorRadianDist(cole(biggest_section),rowe(biggest_section),...
             worm.center(end,1),worm.center(end,2)); 
     if(dist(2)<dist(1))
         worm.center = transpose(fliplr(transpose(worm.center)));
+        flag = 1;
     end
 
  %start tracking along worm   
@@ -206,9 +213,9 @@ for i = 1:vid.NumberOfFrames+500;
     end
     dist(dist==0) = max(dist);
     
-    hold on;
-    plot(pointsc,pointsr,'r*');
-    plot(cole,rowe,'go','linewidth',3)
+    %hold on;
+    %plot(pointsc,pointsr,'r*');
+    %plot(cole,rowe,'go','linewidth',3)
     
     [val,loc] = min(dist);
     close_points = sum(dist<val*2);
@@ -241,17 +248,17 @@ for i = 1:vid.NumberOfFrames+500;
             length(pixels)
         end
         [val,loc]=min(pixel_std);
-        title([num2str(i),'     ',num2str(min(pixel_min))]);
+        %title([num2str(i),'     ',num2str(min(pixel_min))]);
         %if(sum(pixel_std<min(pixel_std)*4)>1)
         if(1)
             next_point = predict_point([pointsc(end-15:end),pointsr(end-15:end)],15);
             average_point = (next_point+3*worm.center(current_index,:))/4;
-            imshow(second_frame)
-                hold on;
-            plot(pointsc,pointsr,'r*');
-            plot(colb(locs),rowb(locs),'g*','linewidth',3)
+            %imshow(second_frame)
+            %    hold on;
+            %plot(pointsc,pointsr,'r*');
+            %plot(colb(locs),rowb(locs),'g*','linewidth',3)
             
-            plot(average_point(1),average_point(2),'k*','linewidth',2);
+            %plot(average_point(1),average_point(2),'k*','linewidth',2);
             
             %find the endpoint that is closest to the predicted point
             dist = zeros(length(locs),1);
@@ -265,15 +272,15 @@ for i = 1:vid.NumberOfFrames+500;
         end
         temp = pixelLine1([colb(locs(loc)),rowb(locs(loc))],[pointsc(end),pointsr(end)],labeled==labeled(rowb(locs(loc)),colb(locs(loc))),1);
         temp(pointsr(end),pointsc(end))=1;
-        imshow(temp)
-        hold on;
-        plot(colb(locs),rowb(locs),'g*','linewidth',3)
-        plot(pointsc(end),pointsr(end),'r*');
+        %imshow(temp)
+        %hold on;
+        %plot(colb(locs),rowb(locs),'g*','linewidth',3)
+        %plot(pointsc(end),pointsr(end),'r*');
         %pause(2)
         D = bwdistgeodesic(temp,pointsc(end),pointsr(end));
         
         %D = bwdistgeodesic(skel_broke,colb(locs(loc)),rowb(locs(loc)));
-        plot(colb(locs(loc)),rowb(locs(loc)),'ko');
+        %plot(colb(locs(loc)),rowb(locs(loc)),'ko');
     else
         break;
     end
@@ -281,7 +288,12 @@ for i = 1:vid.NumberOfFrames+500;
     c_length = sum(sqrt(sum(transpose(diff([pointsc,pointsr]).^2))));
  end
  bin1=bin2;
+
  worm.center = skel_handles([pointsc,pointsr],num_points);
+ if(flag)
+     worm.center = transpose(fliplr(transpose(worm.center)));
+ end
+ worm_coords = [worm_coords,worm.center];
  colors = jet(length(worm.center));
  imshow(second_frame);
 for j = 1:length(worm.center)
@@ -294,8 +306,9 @@ end
  frame = getframe(gcf);
  writeVideo(vido,frame);
  pause(.1)
- clf('reset')
+ %clf('reset')
 end
+xlswrite([newfile,'.xls'],worm_coords);
 close(vido);
     
     
