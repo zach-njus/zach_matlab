@@ -1,4 +1,4 @@
-function [ skel,bin2 ] = brugia_skeleton( frame_n,bin1,background,ave_w )
+function [ skel,bin2,dist_trans ] = brugia_skeleton( frame_n,bin1,background,ave_w )
 %BRUGIA_SKELETON creates a skeleton with a brugia worm
 
 %find the difference between the background and current frame

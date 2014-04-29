@@ -1,10 +1,11 @@
-function [ D ] = span_gap( points,model,curr_idx,skel,labeled,ave_w )
+function [ D ] = span_gap( points,model,curr_idx,bin,labeled,ave_w )
 %SPAN_GAP takes in the points that have been previously traversed
 
 pointsc = points(:,1);
 pointsr = points(:,2);
 
 %find endpoints that qualify to be jumped to
+%{
 [rowb,colb] = find(bwmorph(skel,'endpoints'));
 dist = zeros(length(rowb),1);
 vect = dist;
@@ -17,16 +18,36 @@ for j = 1:length(rowb)
 end
 dist(dist==0) = max(dist);
 [distance,~] = min(dist); 
+%}
+
+%find endpoints that qualify to be jumped to
+[rowb,colb] = find(bwmorph(labeled,'endpoints'));
+indexes = [];
+
+for j = 1:length(rowb)
+    if(rowb(j) ~= pointsr(end) || colb(j) ~= pointsc(end))
+        indecies = pixelLine_pixels([pointsc(end),pointsr(end)],[colb(j),rowb(j)]);
+        
+        values = zeros(length(indecies),1);
+        for k = 1:size(indecies,1)
+            values(k) = bin(indecies(k,1),indecies(k,2))
+        end
+        if(min(values)==1 && length(values)>1)
+            indexes = [indexes;j];
+        end
+    end
+end
 
 %if there is a point close enough it can be jumped to 
-if(distance<50 && distance > 0)
+if(~isempty(indexes))
     %use the old points to predict where the next point should be
-    next_point = predict_point([pointsc(end-15:end),pointsr(end-15:end)],15);
+    %next_point = predict_point([pointsc(end-15:end),pointsr(end-15:end)],15);
     %use the locaiton of the old model point with the predicted point to
     %find an average location
-    average_point = (next_point+model(curr_idx,:))/2;
-    locs = find(dist<distance*4);
+    %average_point = (next_point+model(curr_idx,:))/2;
+    %locs = find(dist<distance*4);
     %locs = find(dist);
+    locs = indexes;
     
     %imshow(labeled)
     %hold on;

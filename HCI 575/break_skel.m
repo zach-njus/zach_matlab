@@ -32,7 +32,7 @@ end
 
 %eliminate small sections of skeleton and add back in end sections if
 %eliminated
-skel_broke = bwareaopen(skel_broke,5,8);
+skel_broke = bwareaopen(skel_broke,round(average_width*4),8);
 skel_broke = skel_broke|skel_endsections;
 
 end

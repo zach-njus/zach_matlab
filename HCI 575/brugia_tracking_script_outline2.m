@@ -9,7 +9,7 @@ vid = VideoReader(filename);
 
 %%
 %display the first frame to perform segmentation
-start_frame = 200;
+start_frame = 1;
 first_frame = read(vid,start_frame);
 mask = roipoly(first_frame);
 background = first_frame;
@@ -42,7 +42,7 @@ for i = 1:length(worm.center)
 end
 %%
 %make output video
-newfile = 'video15';
+newfile = 'video16';
 vido = VideoWriter([newfile,'.mp4'],'MPEG-4');
 vido.FrameRate = 10;
 open(vido);
@@ -58,12 +58,12 @@ worm_length = sum(sqrt(sum(transpose(diff(worm.center).^2))));
 %array to store all points throughout video
 worm_coords = [];
 
-for i = start_frame:start_frame+200; 
+for i = start_frame:start_frame+100; 
     %read in current frame
     second_frame = read(vid,i);
     
     %create a skeleton and segment out the worm
-    [skel,bin2] = brugia_skeleton( second_frame,bin1,background,average_width );
+    [skel,bin2,fat_skel] = brugia_skeleton( second_frame,bin1,background,average_width );
 
     %break apart skeleton
     [skel_broke,biggest_section] = break_skel(skel,average_width);
@@ -121,7 +121,8 @@ for i = start_frame:start_frame+200;
         %plot(pointsc,pointsr,'r*');
 
         %A branch point has been reached so a decision is necessary
-        D = span_gap([pointsc,pointsr],worm.center,current_index,skel_broke,labeled,average_width);
+        D = span_gap([pointsc,pointsr],worm.center,current_index,bin2,labeled,average_width);
+
 
         %if there is no point to jump to break out of the loop
         if(isnan(D))
@@ -150,7 +151,7 @@ for i = start_frame:start_frame+200;
     for j = 1:length(worm.center)
         circle(worm.center(j,1),worm.center(j,2),average_width,colors(j,:));
     end
-
+    waitforbuttonpress;
      %write the shown image to a video
      frame = getframe(gcf);
      writeVideo(vido,frame);

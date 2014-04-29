@@ -10,6 +10,9 @@ else
     pointsc = [];
 end
 
+%remove nans and inf from the distance matrix
+D(isnan(D))=0;
+D(isinf(D))=-1;
 
 for j = 1:max(max(D));
     %find the next point to connect to
